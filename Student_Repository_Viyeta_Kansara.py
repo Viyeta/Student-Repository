@@ -1,23 +1,21 @@
-"""  Date: 21st April 2021
+"""  Date: 27th April 2021
      Code by: Viyeta Kansara
      CWID: 10473081
 
      About Development: Assignment is to do following task:
-                        1) Update your HW09 code to use the new HW10 data files
-                        2) Add the new functionality to compute the student's GPA
-                        3) Add new functionality to read the majors file and calculate the remaining required and
-                           elective classes for each student
-                        4) Add a new Majors prettytable
-                        5) Update the Student prettytable to include the student's GPA and remaining classes and
-                           electives for each student
-                        6) Implement automated tests to verify that the data in the prettytables matches the data from
-                           the input data files.
+                        1) Update your code to use the new data files that use '\t' to separate the fields and each file
+                        has a header record
+                        2) Add a new student_grades_table_db(self, db_path) method to your Repository class to create a
+                        new student grades PrettyTable that retrieves the data for the table from the database you
+                        created above using 'db_path' to specify the path of your SQLite database file.
+
 """
 
 from prettytable import PrettyTable
 from collections import defaultdict
 from functools import reduce
 import os
+import sqlite3
 
 
 class Repository:
@@ -37,6 +35,8 @@ class Repository:
         # Here Key is Grade value as it's unique id
         self.grade_to_number_dict = {}
 
+        self.db_path = "student_repo.sqlite"
+
         self.major(os.path.join(self.directory, "majors.txt"))
         self.student(os.path.join(self.directory, "students.txt"))
         self.instructor(os.path.join(self.directory, "instructors.txt"))
@@ -50,6 +50,8 @@ class Repository:
         self.pretty_table_student()
         print("Instructor Summary")
         self.pretty_table_instructor()
+        print("Student Grade Summary")
+        self.pretty_table_student_grades_table_db()
 
     def major(self, path):
         """Check for valid major file and create major dictionary"""
@@ -93,9 +95,9 @@ class Repository:
                 student_file.seek(0)
                 student_file.readline()
                 for lines in student_file:
-                    if len(lines.strip().split(";")) != 3:
+                    if len(lines.strip().split("\t")) != 3:
                         raise IndexError("Line doesn't have 3 fields")
-                    student_id, student_name, student_major = lines.strip().split(";")
+                    student_id, student_name, student_major = lines.strip().split("\t")
                     self.student_dict[student_id] = Student(
                         student_id, student_name, student_major
                     )
@@ -114,13 +116,13 @@ class Repository:
                 instructor_file.seek(0)
                 instructor_file.readline()
                 for lines in instructor_file:
-                    if len(lines.strip().split("|")) != 3:
+                    if len(lines.strip().split("\t")) != 3:
                         raise IndexError("Line doesn't have 3 fields")
                     (
                         instructor_id,
                         instructor_name,
                         instructor_dept,
-                    ) = lines.strip().split("|")
+                    ) = lines.strip().split("\t")
                     self.instructor_dict[instructor_id] = Instructor(
                         instructor_id, instructor_name, instructor_dept
                     )
@@ -138,9 +140,9 @@ class Repository:
             else:
                 grades_to_numbers_file.seek(0)
                 for lines in grades_to_numbers_file:
-                    if len(lines.strip().split("|")) != 2:
+                    if len(lines.strip().split("\t")) != 2:
                         raise IndexError("Line doesn't have 2 fields")
-                    (grade, number) = lines.strip().split("|")
+                    (grade, number) = lines.strip().split("\t")
                     self.grade_to_number_dict[grade] = float(number)
                 grades_to_numbers_file.close()
 
@@ -159,14 +161,14 @@ class Repository:
                 grade_file.seek(0)
                 grade_file.readline()
                 for lines in grade_file:
-                    if len(lines.strip().split("|")) != 4:
+                    if len(lines.strip().split("\t")) != 4:
                         raise IndexError("Line doesn't have 4 fields")
                     (
                         student_id,
                         student_course,
                         student_grade,
                         instructor_id,
-                    ) = lines.strip().split("|")
+                    ) = lines.strip().split("\t")
                     if student_id in self.student_dict:
                         s = self.student_dict[student_id]
                         s.add_course_grade(student_course, student_grade)
@@ -181,6 +183,27 @@ class Repository:
                         print("Unknown Instructor found")
 
                 grade_file.close()
+
+    def student_grades_table_db(self, db_path="student_repo.sqlite"):
+        """Using 'db_path' by specifying the path of SQLite database file. Executing the student
+        grades summary query using Python calls and then executing the query to generate and display a
+        student grades PrettyTable with the results."""
+
+        self.db_path = db_path
+        db: sqlite3.Connection = sqlite3.connect(self.db_path)
+        query: str = """SELECT s.Name, s.CWID,g.Course, g.grade, i.Name FROM students s JOIN grades g 
+                         ON s.CWID = g.StudentCWID JOIN instructors i ON g.InstructorCWID = i.CWID
+                         ORDER BY s.Name"""
+        for row in db.execute(query):
+            # [Student Name, Student CWID, Course, Grade, Instructor Name]
+            yield [row[0], row[1], row[2], row[3], row[4]]
+
+    def pretty_table_student_grades_table_db(self):
+        """Print all student grade info pretty table"""
+        pt = PrettyTable(field_names=["Name", "CWID", "Course", "Grade", "Instructor"])
+        for m in self.student_grades_table_db():
+            pt.add_row(m)
+        print(pt)
 
     def pretty_table_major(self):
         """Print all majors info pretty table"""

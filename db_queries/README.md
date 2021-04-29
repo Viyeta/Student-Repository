@@ -2,6 +2,7 @@
 Author: Viyeta Kansara\
 CWID: 10473081
 
+Screen dumps of **DataGRIP** to ***show queries and results*** for each of the following questions:
 
 1. What is the name of the student with CWID='10115'   (NOTE: if you don't find any matching records then verify that the CWID has type TEXT in all four tables.   Integers don't match strings in SQL or Python.)
     ```
